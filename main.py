@@ -1,5 +1,5 @@
-#from model import SRCNN
-#from utils import input_setup
+from model import SRCNN
+from utils import input_setup
 
 import numpy as np
 from absl import app
@@ -37,6 +37,15 @@ def main(_):
         os.makedirs(FLAGS.checkpoint_dir)
     if not os.path.exists(FLAGS.sample_dir):
         os.makedirs(FLAGS.sample_dir)
+
+    srcnn = SRCNN(image_size=FLAGS.image_size,
+                  label_size=FLAGS.label_size,
+                  batch_size=FLAGS.batch_size,
+                  c_dim=FLAGS.c_dim,
+                  checkpoint_dir=FLAGS.checkpoint_dir,
+                  sample_dir=FLAGS.sample_dir)
+
+    srcnn.train(FLAGS)
 
 
 if __name__ == '__main__':

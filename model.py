@@ -18,6 +18,7 @@ import numpy as np
 
 import tensorflow.keras.layers as kl
 import tensorflow as tf
+from tensorflow.python.keras import backend as K
 
 
 # SRCNN
@@ -44,24 +45,21 @@ class SRCNN(tf.keras.Model):
         self.sample_dir = sample_dir
 
         # モデル構築
-        # conv1: 9*9のフィルタ、特徴マップ64
-        # conv2: 1*1のフィルタ、特徴マップ32
-        # conv3: 5*5のフィルタ、特徴マップ1 <-これが高解像度画像
+        # conv1: [9 x 9]のフィルタ、特徴マップ64
+        # conv2: [1 x 1]のフィルタ、特徴マップ32
+        # conv3: [5 x 5]のフィルタ、特徴マップ1 <-これが高解像度画像
         self.conv1 = kl.Conv2D(64, (9, 9), padding='same', activation='relu',
                                input_shape=(None, self.image_size, self.image_size, self.c_dim))
         self.conv2 = kl.Conv2D(32, (1, 1), padding='same', activation='relu')
         self.conv3 = kl.Conv2D(1, (5, 5), padding='same', activation='relu')
 
-        self.pred = self.model()
-        self.loss = tf.reduce_mean(tf.square(self.labels - self.pred))
-
         self.compile(optimizer=tf.keras.optimizers.Adam(),
                      loss=tf.keras.losses.MeanSquaredError(),
-                     metrics=[self.loss])
+                     metrics=[self.psnr])
 
     # 順伝搬
-    def model(self):
-        h1 = self.conv1(self.images)
+    def call(self, x):
+        h1 = self.conv1(x)
         h2 = self.conv2(h1)
         h3 = self.conv3(h2)
 
@@ -71,7 +69,7 @@ class SRCNN(tf.keras.Model):
         if config.is_train:
             input_setup(config)
         else:
-            nx, ny = input_setup(self.sess, config)
+            nx, ny = input_setup(config)
 
         if config.is_train:
             data_dir = os.path.join('./{}'.format(config.checkpoint_dir), "train.h5")
@@ -79,3 +77,45 @@ class SRCNN(tf.keras.Model):
             data_dir = os.path.join('./{}'.format(config.checkpoint_dir), "test.h5")
 
         train_data, train_label = read_data(data_dir)
+
+        if self.load(self.checkpoint_dir):
+            print(" [*] Load SUCCESS")
+        else:
+            print(" [!] Load failed...")
+
+        if config.is_train:
+            print("Training...")
+
+        # 学習
+        his = self.fit(train_data, train_label, batch_size=self.batch_size, epochs=config.epoch)
+
+        print("Saving parameters...")
+        self.save_weights(self.checkpoint_dir)
+        print("Successfully completed\n\n")
+
+        return his, self
+
+    # PSNR(ピーク信号対雑音比)
+    def psnr(self, h3, labels):
+
+        return -10 * K.log(K.mean(K.flatten((h3 - labels)) ** 2)) / np.log(10)
+
+
+# PSNR, 損失値グラフ出力
+def graph_output(history):
+
+    # PSNRグラフ
+    plt.plot(history.history['psnr'])
+    plt.title('Model PSNR')
+    plt.ylabel('PSNR')
+    plt.xlabel('Epoch')
+    plt.legend(['Train'], loc='upper left')
+    plt.show()
+
+    # 損失値グラフ
+    plt.plot(history.history['loss'])
+    plt.title('Model loss')
+    plt.ylabel('Loss')
+    plt.xlabel('Epoch')
+    plt.legend(['Train'], loc='upper left')
+    plt.show()

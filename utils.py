@@ -1,20 +1,14 @@
 import os
 import glob
 import h5py
-import random
-import matplotlib.pyplot as plt
 
-from PIL import Image  # for loading images as YCbCr format
 import imageio
 import scipy.misc
 import scipy.ndimage
 import numpy as np
 from absl import flags
 
-import tensorflow as tf
-
 xrange = range
-
 FLAGS = flags.FLAGS
 
 
@@ -140,7 +134,6 @@ def input_setup(config):
     Read image files and make their sub-images and saved them as a h5 file format.
     """
     # Load data path
-    global ny
     if config.is_train:
         data = prepare_data(dataset="Train")
     else:
@@ -212,13 +205,21 @@ def input_setup(config):
         return nx, ny
 
 
-
-
 def imsave(image, path):
-    return scipy.misc.imsave(path, image)
+    """
+    Args:
+      :param image: target image
+      :param path: path to save
+    """
+    return imageio.imwrite(path, image)
 
 
 def merge(images, size):
+    """
+    Args:
+      :param images: sub images
+      :param size: output size
+    """
     h, w = images.shape[1], images.shape[2]
     img = np.zeros((h * size[0], w * size[1], 1))
     for idx, image in enumerate(images):
