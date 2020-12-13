@@ -17,6 +17,7 @@ import scipy.ndimage
 import numpy as np
 
 import tensorflow.keras.layers as kl
+from tensorflow.keras import datasets, layers, models
 import tensorflow as tf
 from tensorflow.python.keras import backend as K
 
@@ -44,28 +45,34 @@ class SRCNN(tf.keras.Model):
         self.checkpoint_dir = checkpoint_dir
         self.sample_dir = sample_dir
 
+        """
+        self.pred = self.srcnn915
+        self.loss = tf.keras.reduce_mean(tf.square(self.labels - self.pred))
+        """
+
         # モデル構築
         # conv1: [9 x 9]のフィルタ、特徴マップ64
         # conv2: [1 x 1]のフィルタ、特徴マップ32
         # conv3: [5 x 5]のフィルタ、特徴マップ1 <-これが高解像度画像
-        self.conv1 = kl.Conv2D(64, (9, 9), padding='same', activation='relu',
+        self.conv1 = kl.Conv2D(64, (9, 9), padding='valid', activation='relu',
                                input_shape=(None, self.image_size, self.image_size, self.c_dim))
-        self.conv2 = kl.Conv2D(32, (1, 1), padding='same', activation='relu')
-        self.conv3 = kl.Conv2D(1, (5, 5), padding='same', activation='relu')
+        self.conv2 = kl.Conv2D(32, (1, 1), padding='valid', activation='relu')
+        self.conv3 = kl.Conv2D(1, (5, 5), padding='valid', activation='relu')
 
-        self.compile(optimizer=tf.keras.optimizers.Adam(),
-                     loss=tf.keras.losses.MeanSquaredError(),
-                     metrics=[self.psnr])
+        """
+        self.pred = self.call()
+        self.loss = tf.reduce_mean(tf.square(self.labels - self.pred))
+        """
 
     # 順伝搬
-    def call(self, x):
-        h1 = self.conv1(x)
+    def call(self, inputs):
+        h1 = self.conv1(inputs)
         h2 = self.conv2(h1)
         h3 = self.conv3(h2)
 
         return h3
 
-    def train(self, config):
+    def train_step(self, config):
         if config.is_train:
             input_setup(config)
         else:
@@ -78,19 +85,19 @@ class SRCNN(tf.keras.Model):
 
         train_data, train_label = read_data(data_dir)
 
-        if self.load(self.checkpoint_dir):
-            print(" [*] Load SUCCESS")
-        else:
-            print(" [!] Load failed...")
-
         if config.is_train:
             print("Training...")
 
         # 学習
+        self.compile(optimizer=tf.keras.optimizers.Adam(),
+                     loss=tf.keras.losses.MeanSquaredError(),
+                     metrics=[self.psnr])
         his = self.fit(train_data, train_label, batch_size=self.batch_size, epochs=config.epoch)
 
         print("Saving parameters...")
-        self.save_weights(self.checkpoint_dir)
+        model_name = "SRCNN.model"
+        checkpoint_dir = os.path.join(self.checkpoint_dir, model_name)
+        self.save_weights(checkpoint_dir)
         print("Successfully completed\n\n")
 
         return his, self
