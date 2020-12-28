@@ -7,6 +7,7 @@ import scipy.misc
 import scipy.ndimage
 import numpy as np
 from absl import flags
+import matplotlib.pyplot as plt
 
 xrange = range
 FLAGS = flags.FLAGS
@@ -71,18 +72,19 @@ def prepare_data(dataset):
     return data
 
 
-def make_data(data, label):
+def make_data(config, data, label):
     """
     Args:
+      :param config: -
       :param data: input data array
       :param label: label data atrray
     Make input data as h5 file format
     Depending on 'is_train' (flag value), savepath would be changed.
     """
     if FLAGS.is_train:
-        savepath = os.path.join(os.getcwd(), 'checkpoint/train.h5')
+        savepath = os.path.join(os.getcwd(), '%s/train.h5' % config.h5_dir)
     else:
-        savepath = os.path.join(os.getcwd(), 'checkpoint/test.h5')
+        savepath = os.path.join(os.getcwd(), '%s/test.h5' % config.h5_dir)
 
     with h5py.File(savepath, 'w') as hf:
         hf.create_dataset('data', data=data)
@@ -101,6 +103,22 @@ def imread(path, is_grayscale=True):
         return imageio.imread(path, as_gray=True, pilmode='YCbCr').astype(np.float)
     else:
         return imageio.imread(path, pilmode='YCbCr').astype(np.float)
+
+
+def compare_res_and_label(res, label, is_grayscale=True):
+    """
+    Args:
+      :param res: result image
+      :param label: label iamge
+      :param is_grayscale: grayscale or not
+    show images
+    """
+    if is_grayscale:
+        plt.subplot(121).imshow(res, cmap="gray")
+        plt.subplot(122).imshow(label, cmap="gray")
+    else:
+        plt.subplot(121).imshow(res)
+        plt.subplot(122).imshow(label)
 
 
 def modcrop(image, scale=3):
@@ -199,7 +217,7 @@ def input_setup(config):
     arrdata = np.asarray(sub_input_sequence)  # [?, 33, 33, 1]
     arrlabel = np.asarray(sub_label_sequence)  # [?, 21, 21, 1]
 
-    make_data(arrdata, arrlabel)
+    make_data(config, arrdata, arrlabel)
 
     if not config.is_train:
         return nx, ny

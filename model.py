@@ -1,8 +1,9 @@
 from utils import (
-  read_data,
-  input_setup,
-  imsave,
-  merge
+    read_data,
+    input_setup,
+    compare_res_and_label,
+    imsave,
+    merge
 )
 
 import os
@@ -30,8 +31,7 @@ class SRCNN(tf.keras.Model):
                  label_size=21,
                  batch_size=128,
                  c_dim=1,
-                 checkpoint_dir=None,
-                 sample_dir=None):
+                 checkpoint_dir=None):
 
         super(SRCNN, self).__init__()
 
@@ -43,7 +43,6 @@ class SRCNN(tf.keras.Model):
         self.c_dim = c_dim
 
         self.checkpoint_dir = checkpoint_dir
-        self.sample_dir = sample_dir
 
         """
         self.pred = self.srcnn915
@@ -76,53 +75,87 @@ class SRCNN(tf.keras.Model):
         if config.is_train:
             input_setup(config)
         else:
-            nx, ny = input_setup(config)
+            print("invalid config")
+            return
 
         if config.is_train:
-            data_dir = os.path.join('./{}'.format(config.checkpoint_dir), "train.h5")
+            data_dir = os.path.join('./{}'.format(config.h5_dir), "train.h5")
         else:
-            data_dir = os.path.join('./{}'.format(config.checkpoint_dir), "test.h5")
+            print("invalid config")
+            return
 
+        """
+        if self.load(self.checkpoint_dir):
+            print(" [*] Load SUCCESS")
+        else:
+            print(" [!] Load failed...")
+        """
         train_data, train_label = read_data(data_dir)
 
-        if config.is_train:
-            print("Training...")
+        print("Training...")
+
+        # チェックポイント（100エポックずつ保存）
+        checkpoint_path = '%s/cp-x%s-{epoch:04d}.ckpt' % (self.checkpoint_dir, config.scale)
+        cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
+                                                         save_weights_only=True,
+                                                         verbose=1,
+                                                         period=100)
 
         # 学習
         self.compile(optimizer=tf.keras.optimizers.Adam(),
                      loss=tf.keras.losses.MeanSquaredError(),
                      metrics=[self.psnr])
-        his = self.fit(train_data, train_label, batch_size=self.batch_size, epochs=config.epoch)
 
-        print("Saving parameters...")
-        model_name = "SRCNN.model"
-        checkpoint_dir = os.path.join(self.checkpoint_dir, model_name)
-        self.save_weights(checkpoint_dir)
+        self.save_weights(checkpoint_path.format(epoch=0))
+
+        his = self.fit(train_data,
+                       train_label,
+                       batch_size=self.batch_size,
+                       epochs=config.epoch,
+                       callbacks=[cp_callback],
+                       verbose=1)
+
         print("Successfully completed\n\n")
 
         return his, self
 
+    # Test for eval (指定したフォルダ内の画像すべてに超解像)
+    def test_all(self, config):
+
+        if config.is_train:
+            print("invalid config")
+            return
+        else:
+            nx, ny = input_setup(config)
+
+        if config.is_train:
+            print("invalid config")
+            return
+        else:
+            data_dir = os.path.join('./{}'.format(config.h5_dir), "test.h5")
+
+        test_data, test_label = read_data(data_dir)
+
+        latest = tf.train.latest_checkpoint(self.checkpoint_dir)
+        self.load_weights(latest)
+
+        print("Testing...")
+
+        # 高解像度画像作成
+        result = self.predict(test_data)
+        result = merge(result, [nx, ny])
+        result = result.squeeze()
+        result *= 255
+
+        # 正解画像復元
+        label = merge(test_label, [nx, ny])
+        label = label.squeeze()
+        label *= 255
+
+        # 結果と正解をGrayscaleで表示
+        compare_res_and_label(result, label, True)
+        plt.show()
+
     # PSNR(ピーク信号対雑音比)
     def psnr(self, h3, labels):
-
         return -10 * K.log(K.mean(K.flatten((h3 - labels)) ** 2)) / np.log(10)
-
-
-# PSNR, 損失値グラフ出力
-def graph_output(history):
-
-    # PSNRグラフ
-    plt.plot(history.history['psnr'])
-    plt.title('Model PSNR')
-    plt.ylabel('PSNR')
-    plt.xlabel('Epoch')
-    plt.legend(['Train'], loc='upper left')
-    plt.show()
-
-    # 損失値グラフ
-    plt.plot(history.history['loss'])
-    plt.title('Model loss')
-    plt.ylabel('Loss')
-    plt.xlabel('Epoch')
-    plt.legend(['Train'], loc='upper left')
-    plt.show()
