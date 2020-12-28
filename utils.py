@@ -223,7 +223,7 @@ def input_setup(config):
         return nx, ny
 
 
-def imsave(image, path):
+def imsave(path, image):
     """
     Args:
       :param image: target image

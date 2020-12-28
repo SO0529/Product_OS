@@ -119,7 +119,7 @@ class SRCNN(tf.keras.Model):
 
         return his, self
 
-    # Test for eval (指定したフォルダ内の画像すべてに超解像)
+    # Test for eval (指定したフォルダ内の画像すべてに超解像（現在はとりあえず1枚だけ）)
     def test_all(self, config):
 
         if config.is_train:
@@ -154,7 +154,10 @@ class SRCNN(tf.keras.Model):
 
         # 結果と正解をGrayscaleで表示
         compare_res_and_label(result, label, True)
-        plt.show()
+        res_savepath = os.path.join('./{}'.format(config.save_dir), "result.bmp")
+        gt_savepath = os.path.join('./{}'.format(config.save_dir), "gt.bmp")
+        imsave(res_savepath, result)
+        imsave(gt_savepath, label)
 
     # PSNR(ピーク信号対雑音比)
     def psnr(self, h3, labels):
