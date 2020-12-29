@@ -7,6 +7,7 @@ from utils import (
 )
 
 import os
+import csv
 import glob
 import h5py
 import random
@@ -126,7 +127,7 @@ class SRCNN(tf.keras.Model):
             print("invalid config")
             return
         else:
-            nx, ny = input_setup(config)
+            nx, ny, dataname = input_setup(config)
 
         if config.is_train:
             print("invalid config")
@@ -141,23 +142,45 @@ class SRCNN(tf.keras.Model):
 
         print("Testing...")
 
-        # 高解像度画像作成
+        # 高解像度画像作成（全データ結合状態）
         result = self.predict(test_data)
-        result = merge(result, [nx, ny])
-        result = result.squeeze()
-        result *= 255
 
-        # 正解画像復元
-        label = merge(test_label, [nx, ny])
-        label = label.squeeze()
-        label *= 255
+        # 高解像度画像と正解画像を分割してそれぞれ1枚ずつの画像にする
+        split_result = []
+        split_label = []
+        psnr_list = []
+        for i in range(len(nx)):
+            if i == 0:
+                t_res = result[:nx[i]*ny[i], :, :, :]
+                t_label = test_label[:nx[i]*ny[i], :, :, :]
+            else:
+                t_res = result[nx[i-1] * ny[i-1]:nx[i-1] * ny[i-1] + nx[i] * ny[i], :, :, :]
+                t_label = test_label[nx[i-1] * ny[i-1]:nx[i-1] * ny[i-1] + nx[i] * ny[i], :, :, :]
+            split_result.append(t_res)
+            split_label.append(t_label)
+            split_result[i] = merge(split_result[i], [nx[i], ny[i]])
+            split_label[i] = merge(split_label[i], [nx[i], ny[i]])
+            split_result[i] = split_result[i].squeeze()
+            split_label[i] = split_label[i].squeeze()
 
-        # 結果と正解をGrayscaleで表示
-        compare_res_and_label(result, label, True)
-        res_savepath = os.path.join('./{}'.format(config.save_dir), "result.bmp")
-        gt_savepath = os.path.join('./{}'.format(config.save_dir), "gt.bmp")
-        imsave(res_savepath, result)
-        imsave(gt_savepath, label)
+            # PSNR計算
+            psnr_list.append(K.get_value(self.psnr(split_result[i], split_label[i])))
+
+            split_result[i] *= 255
+            split_label[i] *= 255
+
+            # 結果と正解をGrayscaleで表示
+            compare_res_and_label(split_result[i], split_label[i], True)
+            res_savepath = './' + config.save_dir + '/' + os.path.splitext(os.path.basename(dataname[i]))[0] + \
+                           '_res_x%s.bmp' % config.scale
+            gt_savepath = './' + config.save_dir + '/' + os.path.splitext(os.path.basename(dataname[i]))[0] + \
+                          '_gt_x%s.bmp' % config.scale
+            imsave(res_savepath, split_result[i])
+            imsave(gt_savepath, split_label[i])
+
+        with open(config.save_dir + '/psnr.csv', 'w') as f:
+            writer = csv.writer(f, lineterminator='\n')
+            writer.writerow(psnr_list)
 
     # PSNR(ピーク信号対雑音比)
     def psnr(self, h3, labels):

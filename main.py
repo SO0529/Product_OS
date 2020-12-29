@@ -25,11 +25,11 @@ flags.DEFINE_integer("num_F2", 32, "The number of feature map for second layer [
 flags.DEFINE_float("learning_rate", 1e-4, "The learning rate of gradient descent algorithm [1e-4]")
 flags.DEFINE_integer("c_dim", 1, "Dimension of image color. [1]")
 flags.DEFINE_integer("scale", 3, "The size of scale factor for preprocessing input image [3]")
-flags.DEFINE_integer("stride", 21, "The size of stride to apply input image. 14 for train, 21 for test [14]")
+flags.DEFINE_integer("stride", 14, "The size of stride to apply input image. 14 for train, 21 for test [14]")
 flags.DEFINE_string("checkpoint_dir", "checkpoint", "Name of checkpoint directory [checkpoint]")
-flags.DEFINE_string("h5_dir", "h5_dir", "Name of h5 directory [h5_dir]")
-flags.DEFINE_string("save_dir", "save_dir", "Name of saving result directory [save_dir]")
-flags.DEFINE_boolean("is_train", False, "True for training, False for testing [True]")
+flags.DEFINE_string("h5_dir", "input_h5", "Name of h5 directory [input_h5]")
+flags.DEFINE_string("save_dir", "result", "Name of saving result directory [result]")
+flags.DEFINE_boolean("is_train", True, "True for training, False for testing [True]")
 
 # print見やすくするだけ
 pp = pprint.PrettyPrinter()
@@ -73,27 +73,6 @@ def main(_):
     if not os.path.exists(FLAGS.save_dir):
         os.makedirs(FLAGS.save_dir)
 
-    """
-    srcnn_archtecture = tf.keras.Sequential(
-        [
-            tf.keras.Input(shape=(FLAGS.image_size, FLAGS.image_size, FLAGS.c_dim)),
-            layers.Conv2D(FLAGS.num_F1, (9, 9), strides=(1, 1), padding="same", activation='relu'),
-            layers.Conv2D(FLAGS.num_F2, (1, 1), strides=(1, 1), padding="same", activation='relu'),
-            layers.Conv2D(1, (5, 5), strides=(1, 1), padding="same", activation='relu'),
-        ],
-        name="Srcnn915",
-    )
-    """
-    """
-    srcnn = SRCNN(srcnn_archtecture,
-                  image_size=FLAGS.image_size,
-                  label_size=FLAGS.label_size,
-                  batch_size=FLAGS.batch_size,
-                  c_dim=FLAGS.c_dim,
-                  checkpoint_dir=FLAGS.checkpoint_dir,
-                  sample_dir=FLAGS.sample_dir)
-
-    """
     srcnn = SRCNN(image_size=FLAGS.image_size,
                   label_size=FLAGS.label_size,
                   batch_size=FLAGS.batch_size,

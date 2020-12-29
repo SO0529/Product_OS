@@ -40,6 +40,8 @@ def preprocess(path, scale=3):
       :param scale: magnification
       input_: image applied bicubic interpolation (low-resolution)
       label_: image with original resolution (high-resolution)
+
+    memo: 入力画像は拡大率で縮小して再拡大したもの。ラベルは入力画像そのもの（端は削る）
     """
     image = imread(path, is_grayscale=True)
     label_ = modcrop(image, scale)
@@ -131,6 +133,8 @@ def modcrop(image, scale=3):
     We need to find modulo of height (and width) and scale factor.
     Then, subtract the modulo from height (and width) of original image size.
     There would be no remainder even after scaling operation.
+
+    memo: 画像の縮小をして拡大する際に拡大率で割り切れる縦横にするために削る
     """
     if len(image.shape) == 3:
         h, w, _ = image.shape
@@ -159,6 +163,9 @@ def input_setup(config):
 
     sub_input_sequence = []
     sub_label_sequence = []
+    # for test
+    nx_sequence = []
+    ny_sequence = []
     padding = abs(config.image_size - config.label_size) / 2  # 6
 
     if config.is_train:
@@ -185,42 +192,46 @@ def input_setup(config):
                     sub_label_sequence.append(sub_label)
 
     else:
-        input_, label_ = preprocess(data[2], config.scale)
+        for i in xrange(len(data)):
+            input_, label_ = preprocess(data[i], config.scale)
 
-        if len(input_.shape) == 3:
-            h, w, _ = input_.shape
-        else:
-            h, w = input_.shape
+            if len(input_.shape) == 3:
+                h, w, _ = input_.shape
+            else:
+                h, w = input_.shape
 
-        # Numbers of sub-images in height and width of image are needed to compute merge operation.
-        nx = ny = 0
-        for x in range(0, h - config.image_size + 1, config.stride):
-            nx += 1
-            ny = 0
-            for y in range(0, w - config.image_size + 1, config.stride):
-                ny += 1
-                sub_input = input_[x:x + config.image_size, y:y + config.image_size]  # [33 x 33]
-                sub_label = label_[x + int(padding):x + int(padding) + config.label_size, 
-                            y + int(padding):y + int(padding) + config.label_size]  # [21 x 21]
+            # Numbers of sub-images in height and width of image are needed to compute merge operation.
+            nx = ny = 0
+            for x in range(0, h - config.image_size + 1, config.stride):
+                nx += 1
+                ny = 0
+                for y in range(0, w - config.image_size + 1, config.stride):
+                    ny += 1
+                    sub_input = input_[x:x + config.image_size, y:y + config.image_size]  # [33 x 33]
+                    sub_label = label_[x + int(padding):x + int(padding) + config.label_size,
+                                y + int(padding):y + int(padding) + config.label_size]  # [21 x 21]
 
-                sub_input = sub_input.reshape([config.image_size, config.image_size, 1])
-                sub_label = sub_label.reshape([config.label_size, config.label_size, 1])
+                    sub_input = sub_input.reshape([config.image_size, config.image_size, 1])
+                    sub_label = sub_label.reshape([config.label_size, config.label_size, 1])
 
-                sub_input_sequence.append(sub_input)
-                sub_label_sequence.append(sub_label)
+                    sub_input_sequence.append(sub_input)
+                    sub_label_sequence.append(sub_label)
+
+            nx_sequence.append(nx)
+            ny_sequence.append(ny)
 
     """
     len(sub_input_sequence) : the number of sub_input (33 x 33 x ch) in one image
     (sub_input_sequence[0]).shape : (33, 33, 1)
     """
-    # Make list to numpy array. With this transform
+    # Make list to numpy array. With this transfor
     arrdata = np.asarray(sub_input_sequence)  # [?, 33, 33, 1]
     arrlabel = np.asarray(sub_label_sequence)  # [?, 21, 21, 1]
 
     make_data(config, arrdata, arrlabel)
 
     if not config.is_train:
-        return nx, ny
+        return nx_sequence, ny_sequence, data
 
 
 def imsave(path, image):
@@ -229,7 +240,7 @@ def imsave(path, image):
       :param image: target image
       :param path: path to save
     """
-    return imageio.imwrite(path, image)
+    return imageio.imwrite(path, image.astype('uint8'))
 
 
 def merge(images, size):
