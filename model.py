@@ -149,13 +149,16 @@ class SRCNN(tf.keras.Model):
         split_result = []
         split_label = []
         psnr_list = []
+        n_start = 0     # 統合状態での各画像のスタートポイント
         for i in range(len(nx)):
             if i == 0:
                 t_res = result[:nx[i]*ny[i], :, :, :]
                 t_label = test_label[:nx[i]*ny[i], :, :, :]
+                n_start = nx[i]*ny[i]
             else:
-                t_res = result[nx[i-1] * ny[i-1]:nx[i-1] * ny[i-1] + nx[i] * ny[i], :, :, :]
-                t_label = test_label[nx[i-1] * ny[i-1]:nx[i-1] * ny[i-1] + nx[i] * ny[i], :, :, :]
+                t_res = result[n_start:n_start + nx[i] * ny[i], :, :, :]
+                t_label = test_label[n_start:n_start + nx[i] * ny[i], :, :, :]
+                n_start += nx[i] * ny[i]
             split_result.append(t_res)
             split_label.append(t_label)
             split_result[i] = merge(split_result[i], [nx[i], ny[i]])
