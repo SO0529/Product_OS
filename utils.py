@@ -9,6 +9,8 @@ import numpy as np
 from absl import flags
 import matplotlib.pyplot as plt
 
+from tensorflow.python.keras import backend as K
+
 xrange = range
 FLAGS = flags.FLAGS
 
@@ -68,6 +70,7 @@ def prepare_data(dataset):
         data_dir = os.path.join(os.getcwd(), dataset)
         data = glob.glob(os.path.join(data_dir, "*.bmp"))
     else:
+        # Set5を指定
         data_dir = os.path.join(os.sep, (os.path.join(os.getcwd(), dataset)), "Set5")
         data = glob.glob(os.path.join(data_dir, "*.bmp"))
 
@@ -257,3 +260,90 @@ def merge(images, size):
         img[j * h:j * h + h, i * w:i * w + w, :] = image
 
     return img
+
+
+def make_images(outputs, labels, nx, ny):
+    """
+    Args:
+      :param outputs: high resolution images (float)
+      :param labels: ground truth
+      :param nx: start point list for x
+      :param ny: start point list for y
+    Memo: サブ画像の連結結果を画像のリストで返す
+    """
+    split_outputs = []
+    split_labels = []
+    n_start = 0  # 統合状態での各画像のスタートポイント
+    for i in range(len(nx)):
+        if i == 0:
+            t_res = outputs[:nx[i] * ny[i], :, :, :]
+            t_label = labels[:nx[i] * ny[i], :, :, :]
+            n_start = nx[i] * ny[i]
+        else:
+            t_res = outputs[n_start:n_start + nx[i] * ny[i], :, :, :]
+            t_label = labels[n_start:n_start + nx[i] * ny[i], :, :, :]
+            n_start += nx[i] * ny[i]
+        split_outputs.append(t_res)
+        split_labels.append(t_label)
+        split_outputs[i] = merge(split_outputs[i], [nx[i], ny[i]])
+        split_labels[i] = merge(split_labels[i], [nx[i], ny[i]])
+        split_outputs[i] = split_outputs[i].squeeze()
+        split_labels[i] = split_labels[i].squeeze()
+
+        #split_outputs[i] *= 255
+        #split_labels[i] *= 255
+
+    return split_outputs, split_labels
+
+
+def make_bc_mages(bc_images, nx, ny, config):
+    """
+    Args:
+      :param bc_images: bicubic images (float)
+      :param nx: start point list for x
+      :param ny: start point list for y
+      :param config: -
+    Memo: Bicubic画像の連結結果を画像のリストで返す。畳み込みしていないので削る
+    """
+    split_bc = []
+    n_start = 0  # 統合状態での各画像のスタートポイント
+    shave = abs(config.image_size - config.label_size) // 2  # 6
+    for i in range(len(nx)):
+        if i == 0:
+            t_bc = bc_images[:nx[i] * ny[i], shave:-shave, shave:-shave, :]
+            n_start = nx[i] * ny[i]
+        else:
+            t_bc = bc_images[n_start:n_start + nx[i] * ny[i], shave:-shave, shave:-shave, :]
+            n_start += nx[i] * ny[i]
+        split_bc.append(t_bc)
+        split_bc[i] = merge(split_bc[i], [nx[i], ny[i]])
+        split_bc[i] = split_bc[i].squeeze()
+        #split_bc[i] *= 255
+
+    return split_bc
+
+
+def make_psnr_list(refs, labels):
+    """
+    Args:
+      :param refs: ref images (List)
+      :param labels: ground truth images (List)
+    """
+    psnr_list = []
+
+    for i in range(len(refs)):
+        t_psnr = psnr(refs[i], labels[i])
+        psnr_list.append(K.get_value(t_psnr))
+
+    return psnr_list
+
+
+def psnr(ref, label):
+    """
+    Args:
+      :param ref: ref image　
+      :param label: ground truth image
+    Memo: Modelの中の関数はクラス内にあるのでこちらにも定義
+    """
+    return -10 * K.log(K.mean(K.flatten((ref - label)) ** 2)) / np.log(10)
+

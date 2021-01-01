@@ -14,7 +14,7 @@ import datetime
 # 33*33の入力が9*1*5の畳み込みで画像周り6pix分小さくなるため、ラベルは21*21となる
 # 学習時は"is_train"をFalseにする
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("epoch", 5, "Number of epoch []")
+flags.DEFINE_integer("epoch", 500, "Number of epoch []")
 flags.DEFINE_integer("batch_size", 128, "The size of batch images [128]")
 flags.DEFINE_integer("image_size", 33, "The size of image to use [33]")
 flags.DEFINE_integer("label_size", 21, "The size of label to produce [21]")
@@ -22,12 +22,13 @@ flags.DEFINE_integer("num_F1", 64, "The number of feature map for first layer [6
 flags.DEFINE_integer("num_F2", 32, "The number of feature map for second layer [32]")
 flags.DEFINE_float("learning_rate", 1e-4, "The learning rate of gradient descent algorithm [1e-4]")
 flags.DEFINE_integer("c_dim", 1, "Dimension of image color. [1]")
-flags.DEFINE_integer("scale", 3, "The size of scale factor for preprocessing input image [3]")
-flags.DEFINE_integer("stride", 21, "The size of stride to apply input image. 14 for train, 21 for test")
+flags.DEFINE_integer("scale",3, "The size of scale factor for preprocessing input image [3]")
 flags.DEFINE_string("checkpoint_dir", "checkpoint", "Name of checkpoint directory [checkpoint]")
 flags.DEFINE_string("h5_dir", "input_h5", "Name of h5 directory [input_h5]")
 flags.DEFINE_string("save_dir", "result", "Name of saving result directory [result]")
-flags.DEFINE_boolean("is_train", False, "True for training, False for testing [True]")
+# Change by Train or Test
+flags.DEFINE_boolean("is_train", True, "True for training, False for testing [True]")
+flags.DEFINE_integer("stride", 14, "The size of stride to apply input image. 14 for train, 21 for test")
 
 # print見やすくするだけ
 pp = pprint.PrettyPrinter()
